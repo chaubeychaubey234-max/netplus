@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+data/
+netpulse.sqlite3
+config/server.json
+config/agent.json
+config/snmp.json
+config/agent-queue.sqlite3
+.DS_Store

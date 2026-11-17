@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="NetPulse intelligent network monitoring and fault diagnosis.">
+  <title>NetPulse</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header><div class="bar"><a class="brand" href="/"><span>∿</span> NetPulse</a><p id="last-update">Connecting…</p></div></header>
+  <main>
+    <section class="hero">
+      <div><p class="eyebrow">INTELLIGENT NETWORK MONITORING</p><h1>Know where the connection fails.</h1></div>
+      <div class="status" id="diagnosis"><p>Diagnosing</p><h2>Waiting for agent reports</h2><span>low confidence</span><p class="evidence">Start an agent to send the first network probe.</p><p class="next-step">Suggested action appears here.</p></div>
+    </section>
+    <section><div class="section-head"><h2>Monitored computers</h2><p>Each row is measured from the device itself.</p></div><div id="agents" class="agents"></div></section>
+    <section class="history"><div class="section-head"><h2 id="history-title">Connection history</h2><select id="agent-selector" aria-label="Choose agent"></select></div><div class="charts"><article><p>Latency</p><strong id="latency">—</strong><canvas id="latency-chart" aria-label="Latency chart"></canvas></article><article><p>Packet loss</p><strong id="loss">—</strong><canvas id="loss-chart" aria-label="Packet loss chart"></canvas></article></div></section>
+    <section><div class="section-head"><h2>Incident timeline</h2><p>Open and recovered network events.</p></div><div id="incidents" class="timeline"></div></section>
+    <section class="details"><article><h2>Latest traceroute</h2><pre id="trace">A traceroute is captured after repeated reachability failures.</pre></article><article><h2>Router or switch SNMP</h2><div id="snmp">No SNMP sample. Configure the optional SNMP poller for supported devices.</div></article></section>
+  </main>
+</body>
+</html>

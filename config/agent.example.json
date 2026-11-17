@@ -1,0 +1,13 @@
+{
+  "agent_id": "macbook-ankush",
+  "network_id": "home-wifi",
+  "server_url": "http://127.0.0.1:8765",
+  "token": "replace-with-the-same-token-as-server.json",
+  "interval_seconds": 15,
+  "upstream_hosts": ["1.1.1.1", "8.8.8.8"],
+  "reference_dns": "1.1.1.1",
+  "test_domain": "example.com",
+  "services": [
+    {"name": "Company portal", "url": "https://example.com", "timeout_seconds": 5}
+  ]
+}

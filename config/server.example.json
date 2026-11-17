@@ -1,0 +1,11 @@
+{
+  "host": "127.0.0.1",
+  "port": 8765,
+  "database": "data/netpulse.sqlite3",
+  "agent_tokens": ["replace-with-a-long-random-token"],
+  "stale_after_seconds": 45,
+  "loss_threshold_percent": 10,
+  "jitter_threshold_ms": 40,
+  "dashboard_auth": {"username": "admin", "password": "replace-this-password"},
+  "alert_webhook_url": null
+}
