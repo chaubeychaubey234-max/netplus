@@ -1,6 +1,7 @@
 {
-  "server_url": "http://127.0.0.1:8000",
+  "server_url": "http://127.0.0.1:8765",
   "token": "replace-with-the-same-token-as-server.json",
+  "network_id": "home-wifi",
   "interval_seconds": 30,
-  "devices": [{"device_id": "lab-router", "host": "192.168.1.1", "community": "public", "interface_index": 1}]
+  "devices": [{"device_id": "lab-router", "host": "192.168.1.1", "community": "replace-with-read-only-community", "interface_index": 1}]
 }

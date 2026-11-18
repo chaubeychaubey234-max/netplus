@@ -1,11 +1,13 @@
 {
   "host": "127.0.0.1",
   "port": 8765,
-  "database": "data/netpulse.sqlite3",
+  "database_url": "postgresql://netpulse:CHANGE_ME@127.0.0.1:5432/netpulse",
   "agent_tokens": ["replace-with-a-long-random-token"],
   "stale_after_seconds": 45,
+  "diagnosis_interval_seconds": 5,
   "loss_threshold_percent": 10,
   "jitter_threshold_ms": 40,
+  "snmp_error_delta_threshold": 10,
   "dashboard_auth": {"username": "admin", "password": "replace-this-password"},
   "alert_webhook_url": null
 }

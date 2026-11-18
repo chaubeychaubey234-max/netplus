@@ -1,100 +1,129 @@
 # NetPulse
 
-NetPulse diagnoses network faults by collecting active probes from every monitored computer. Each agent checks its gateway, two external IP addresses, system DNS, and a reference DNS resolver. The backend compares recent reports and identifies local-link, shared gateway, WAN, DNS, degraded-link, and stale-agent conditions.
+NetPulse is a distributed network-monitoring and fault-localization system. Agents measure connectivity from multiple computers; a FastAPI backend stores probe and SNMP history in PostgreSQL; an evidence-based rule engine returns the most likely fault, supporting observations, confidence, and candidate causes when the evidence is inconclusive. The React dashboard displays device status chains, incidents, traceroute hops, and latency/loss history.
 
-## Components
+Network probes can narrow down a failure, but cannot always identify the exact physical component. NetPulse reports a likely cause and explicitly reports **Cause unclear** when the current measurements do not support a specific diagnosis. In particular, a traceroute timeout alone does not prove that a router is faulty.
 
-| Component | Files | Purpose |
-|---|---|---|
-| Backend | `backend/server.py`, `backend/diagnosis.py` | Receives reports, stores SQLite history, and runs diagnosis. |
-| Frontend | `frontend/` | Dashboard for live status, charts, traceroute, and SNMP. |
-| Agent | `agent/agent.py` | Runs on each Mac or Linux host. It buffers reports locally during backend outages. |
-| SNMP poller | `backend/snmp_poller.py` | Optional router or switch counter polling through `snmpget`. |
+## Architecture
 
-This implementation uses Python's built-in web server and SQLite, so it runs immediately on your Mac. The agent sends real ICMP, DNS, and traceroute probes. It does not include simulated results.
+| Component | Implementation |
+|---|---|
+| Agent | Python and Scapy ICMP/DNS probes, system DNS lookup, traceroute, inventory, and a local SQLite upload queue |
+| Backend | FastAPI JSON API, token-protected ingestion, optional dashboard Basic authentication |
+| Storage | PostgreSQL tables for reports, SNMP samples, diagnosis changes, and incidents; JSONB preserves probe evidence |
+| Diagnosis | Periodic temporal, multi-agent rules using gateway, upstream, DNS, traceroute, and SNMP counter evidence |
+| Dashboard | React, Vite, and Chart.js |
+| Router polling | Optional Net-SNMP `snmpget` poller; counter wrap-around is accounted for |
 
-## Start on your Mac
+Agents and the server use JSON over HTTP in a private lab. Use HTTPS (for example, the included Caddy configuration) when traffic crosses an untrusted network. Scapy uses raw sockets: run the agent with the required privileges and install Npcap when using Windows. Linux VMs are recommended for repeatable lab experiments with `tc netem`.
 
-For a fresh clone, copy the example configuration files and use the same new token in both local files.
+## Local setup
 
-```sh
-cp config/server.example.json config/server.json
-cp config/agent.example.json config/agent.json
+### 1. Install dependencies
+
+Requirements: Python 3.11+, Node.js 20+, PostgreSQL 15+, and (for SNMP polling) Net-SNMP.
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+cd frontend
+npm ci
+npm run build
+cd ..
 ```
 
-The local `server.json` and `agent.json` files are excluded from Git because they contain your agent token and machine settings.
+Create a PostgreSQL database and user, then copy and edit the example configuration:
 
-Start the backend in Terminal window one:
-
-```sh
-python3 backend/server.py
+```powershell
+Copy-Item config\server.example.json config\server.json
+Copy-Item config\agent.example.json config\agent.json
 ```
 
-Open http://127.0.0.1:8765 in your browser. Keep this Terminal window open. If 8765 is occupied, run `python3 backend/server.py --port 8766` and set `server_url` in `config/agent.json` to `http://127.0.0.1:8766`.
+Set a long random token in both configurations and set `database_url` to your PostgreSQL connection string. Replace the dashboard password as well. If the database password contains URL-reserved characters, percent-encode them in the connection string.
 
-Start the agent in Terminal window two:
+Start the backend:
 
-```sh
-python3 agent/agent.py
+```powershell
+python backend\server.py --config config\server.json
 ```
 
-The dashboard shows actual network measurements from your Mac after the first probe cycle. Use Ctrl+C in either Terminal to stop that component.
+Open <http://127.0.0.1:8765>. Start the agent in a second **elevated** terminal:
 
-## Add another computer
-
-1. Copy the NetPulse folder to the second computer.
-2. Change `agent_id` in its `config/agent.json`.
-3. Change `server_url` to your Mac's LAN address, for example `http://192.168.1.20:8000`.
-4. Replace the included local token with a new shared token in the Mac backend config and every agent config.
-5. Change `host` in the Mac `config/server.json` to `0.0.0.0`, restart `backend/server.py`, and allow incoming connections if macOS Firewall asks.
-6. Run `python3 agent/agent.py` on the second computer.
-
-The dashboard now has independent viewpoints. This comparison identifies one device's Wi-Fi or cable issue versus a shared gateway or WAN outage.
-
-## Diagnosis rules
-
-- One agent repeatedly fails to reach its gateway while a peer succeeds. Local link, Wi-Fi, NIC, or cable issue.
-- Every agent repeatedly fails to reach the gateway. Shared LAN, router, or switch issue.
-- Every agent reaches the gateway and repeatedly fails to reach both upstream IPs. WAN or ISP issue.
-- Upstream IP reachability passes, system DNS fails, and reference DNS passes. DNS resolver issue.
-- Recent loss is at least 10% or jitter is at least 40 ms. Degraded connection.
-- No report arrives for 45 seconds. Agent telemetry is stale.
-
-The agent collects traceroute only after two consecutive gateway or upstream failures. Silent traceroute hops are evidence and are not treated as a failure on their own.
-
-## Extended features
-
-- Service checks verify configured websites or internal portals separately from generic internet reachability.
-- Device inventory reports hostname, operating system, local IP addresses, and available Wi-Fi information.
-- Automatic evidence capture saves routing, DNS, Wi-Fi, and traceroute output after repeated failures.
-- Incident history records when a diagnosis starts, remains active, and recovers.
-- The dashboard includes a repair suggestion for every diagnosis.
-- Configure `alert_webhook_url` in `server.json` to send outage alerts to a compatible webhook. It stays disabled until you provide a URL.
-- Set `dashboard_auth` in `server.json` to require a browser username and password.
-- Thresholds for stale telemetry, loss, and jitter are configurable in `server.json`.
-
-## Deployment
-
-`deploy/Dockerfile` and `deploy/docker-compose.yml` package the backend for repeatable deployment. Before running Docker Compose, replace both placeholder values in `deploy/server.json` and put that same agent token in every agent configuration. The included Caddyfile example provides HTTPS when you have a public domain pointed at the deployment machine. Set a real dashboard password and replace the local agent token before exposing the backend outside your private network.
-
-## Optional SNMP
-
-Install the `snmpget` command from Net-SNMP on the backend machine. Copy `config/snmp.example.json` to `config/snmp.json`, set the router address and interface index, then run:
-
-```sh
-python3 backend/snmp_poller.py
+```powershell
+python agent\agent.py --config config\agent.json
 ```
 
-It records interface octets, errors, discards, and calculated inbound throughput. The dashboard shows `N/A` when SNMP is unavailable.
+For agents on other computers, set `server_url` to the backend's reachable LAN address and use a unique `agent_id`. Keep the same `network_id` for computers whose measurements should be compared. Permit only the required lab traffic through the host firewall.
 
-## Evaluation workflow
+### 2. Run the optional SNMP poller
 
-For each trial, record injection time, expected diagnosis, actual diagnosis, and recovery time.
+Copy `config\snmp.example.json` to `config\snmp.json`. Set the same `network_id` as the agents, the router address, interface index, and a read-only SNMP community. Then run:
 
-1. Give one agent a wrong DNS resolver. Expect DNS resolver problem on that agent.
-2. Disable one agent's Wi-Fi or disconnect Ethernet. Expect local link issue when a peer stays healthy.
-3. Disconnect the router's WAN connection. Expect WAN or upstream issue when every agent reaches the gateway.
-4. Add packet loss in an isolated lab path. Expect degraded connection.
-5. Stop an agent process. Expect stale-agent telemetry after 45 seconds.
+```powershell
+python backend\snmp_poller.py --config config\snmp.json
+```
 
-`netpulse.sqlite3` stores backend history. `agent-queue.sqlite3` stores unuploaded agent reports. Delete either only while its corresponding process is stopped if you want to reset its data.
+SNMPv2c communities are sent without encryption. Use a restricted, read-only community on a trusted lab network; do not expose it to the public internet. Devices without SNMP support can still be monitored with agent probes.
+
+## Docker deployment
+
+Copy `deploy/.env.example` to `deploy/.env` and replace every placeholder. Do not commit `.env`. Start PostgreSQL and the backend with:
+
+```sh
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml up --build
+```
+
+The database has a persistent Docker volume. The backend listens on port 8765. Configure agents to use the host's reachable address. To include the optional SNMP poller, also create `config/snmp.json` and start the `snmp` profile:
+
+```sh
+docker compose --profile snmp --env-file deploy/.env -f deploy/docker-compose.yml up --build
+```
+
+For HTTPS, configure a DNS name in `deploy/Caddyfile.example` and proxy to the backend. Restrict direct access to port 8765 if Caddy is the public entry point.
+
+## Diagnosis and evidence
+
+The engine examines up to three recent reports per agent and separates networks by `network_id`. It requires repeated observations for fault rules:
+
+| Repeated observations | Diagnosis |
+|---|---|
+| Every agent fails to reach its gateway | Shared gateway or LAN issue |
+| One agent fails its gateway while another reaches it | Likely local link/device issue |
+| Agents reach the gateway but fail both configured upstream IPs | Likely WAN/upstream issue |
+| Upstream reachability works, system DNS fails, and reference DNS succeeds | DNS resolver issue |
+| Average loss or jitter exceeds configured thresholds | Degraded connection |
+| Traceroute destination is unreachable and multiple hops after the last reply are silent | Possible route interruption, with low confidence |
+| Recent results are inconsistent or incomplete | Cause unclear, with candidate causes |
+
+Rising interface error/discard counters support a local-network or degradation diagnosis; SNMP counters are evidence, not proof of causation. The current score is a rule-based evidence score, not a statistically calibrated probability.
+
+Configure `stale_after_seconds`, `loss_threshold_percent`, `jitter_threshold_ms`, and `snmp_error_delta_threshold` in the server configuration. Dashboard credentials can be set with `NETPULSE_DASHBOARD_USERNAME` and `NETPULSE_DASHBOARD_PASSWORD`; agent tokens can be supplied as a comma-separated `NETPULSE_AGENT_TOKENS` value. Prefer environment variables for deployed secrets.
+
+## Fault-injection evaluation
+
+Use an isolated lab with at least two monitored endpoints and record the known injected fault before examining NetPulse's diagnosis. Include at least ten trials across cases such as:
+
+1. A wrong resolver on one endpoint while a peer uses a working resolver.
+2. One endpoint disconnected from Wi-Fi or Ethernet while a peer remains connected.
+3. Gateway unavailable to all endpoints.
+4. WAN disconnected while the local gateway remains reachable.
+5. Packet loss and added delay on a controlled Linux lab interface using `tc netem`.
+6. DNS reference resolver unreachable while the system resolver works.
+7. Agent stopped to verify stale telemetry.
+8. A route with nonresponsive intermediate hops but a reachable destination.
+9. A route interruption in a controlled virtual network.
+10. A normal/no-fault baseline.
+
+Report diagnosis accuracy, false positives, unclear-result rate, time from fault injection to diagnosis, recovery time, and agent CPU/network overhead. Capture packet traces with Wireshark during selected trials to verify that the generated probes and observed outcomes match the reported evidence. Do not treat a silent traceroute hop as conclusive in isolation.
+
+## Tests and build
+
+```sh
+python -m unittest discover -s tests -v
+cd frontend
+npm ci
+npm run build
+```
+
+PostgreSQL integration tests require a running database; the diagnosis and API unit tests use an in-memory repository where appropriate.

@@ -1,11 +1,13 @@
 {
   "host": "0.0.0.0",
   "port": 8765,
-  "database": "data/netpulse.sqlite3",
-  "agent_tokens": ["replace-before-deploying"],
+  "database_url": "",
+  "agent_tokens": [],
   "stale_after_seconds": 45,
+  "diagnosis_interval_seconds": 5,
   "loss_threshold_percent": 10,
   "jitter_threshold_ms": 40,
-  "dashboard_auth": {"username": "admin", "password": "replace-before-deploying"},
+  "snmp_error_delta_threshold": 10,
+  "dashboard_auth": {},
   "alert_webhook_url": null
 }

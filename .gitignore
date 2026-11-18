@@ -6,4 +6,7 @@ config/server.json
 config/agent.json
 config/snmp.json
 config/agent-queue.sqlite3
+deploy/.env
+frontend/node_modules/
+frontend/dist/
 .DS_Store

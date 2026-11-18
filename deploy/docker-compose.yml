@@ -1,8 +1,57 @@
 services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: netpulse
+      POSTGRES_USER: netpulse
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}
+    volumes:
+      - netpulse-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U netpulse -d netpulse"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
   netpulse:
-    build: .
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    environment:
+      NETPULSE_CONFIG: /app/deploy/server.json
+      NETPULSE_DATABASE_URL: postgresql://netpulse:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}@postgres:5432/netpulse
+      NETPULSE_AGENT_TOKENS: ${NETPULSE_AGENT_TOKEN:?Set NETPULSE_AGENT_TOKEN in deploy/.env}
+      NETPULSE_DASHBOARD_USERNAME: ${NETPULSE_DASHBOARD_USERNAME:?Set NETPULSE_DASHBOARD_USERNAME in deploy/.env}
+      NETPULSE_DASHBOARD_PASSWORD: ${NETPULSE_DASHBOARD_PASSWORD:?Set NETPULSE_DASHBOARD_PASSWORD in deploy/.env}
+      NETPULSE_ALERT_WEBHOOK_URL: ${NETPULSE_ALERT_WEBHOOK_URL:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "8765:8765"
-    volumes:
-      - ../data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/healthz')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     restart: unless-stopped
+
+  snmp-poller:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    command: ["python", "backend/snmp_poller.py", "--config", "/app/config/snmp.json"]
+    volumes:
+      - ../config/snmp.json:/app/config/snmp.json:ro
+    environment:
+      NETPULSE_SERVER_URL: http://netpulse:8765
+      NETPULSE_AGENT_TOKEN: ${NETPULSE_AGENT_TOKEN:?Set NETPULSE_AGENT_TOKEN in deploy/.env}
+    profiles: ["snmp"]
+    depends_on:
+      netpulse:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  netpulse-db:

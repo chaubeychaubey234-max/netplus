@@ -1,0 +1,11 @@
+.git
+**/__pycache__
+**/*.py[cod]
+**/node_modules
+frontend/dist
+config/server.json
+config/agent.json
+config/snmp.json
+deploy/.env
+data
+*.sqlite3
